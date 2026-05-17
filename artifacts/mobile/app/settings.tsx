@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -20,6 +20,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [haptics, setHaptics] = React.useState(true);
   const [notifications, setNotifications] = React.useState(false);
+  const [loopDefault, setLoopDefault] = React.useState(false);
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -56,6 +57,43 @@ export default function SettingsScreen() {
       marginBottom: 8,
       marginLeft: 4,
     },
+    permCard: {
+      backgroundColor: colors.primary + "10",
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.primary + "40",
+      overflow: "hidden",
+    },
+    permRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 16,
+      gap: 14,
+    },
+    permIcons: {
+      flexDirection: "row",
+      gap: -8,
+      marginRight: 4,
+    },
+    permIconCircle: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: colors.background,
+    },
+    permContent: { flex: 1 },
+    permTitle: { fontSize: 15, fontWeight: "700", color: colors.primary },
+    permSub: { fontSize: 12, color: colors.mutedForeground, marginTop: 2 },
+    permBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 10,
+      backgroundColor: colors.primary,
+    },
+    permBtnText: { fontSize: 13, fontWeight: "700", color: "#000" },
     card: {
       backgroundColor: colors.card,
       borderRadius: 16,
@@ -80,17 +118,6 @@ export default function SettingsScreen() {
     rowContent: { flex: 1 },
     rowLabel: { fontSize: 15, fontWeight: "600", color: colors.foreground },
     rowSub: { fontSize: 12, color: colors.mutedForeground, marginTop: 1 },
-    infoCard: {
-      backgroundColor: colors.primary + "10",
-      borderRadius: 16,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: colors.primary + "30",
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 12,
-    },
-    infoText: { flex: 1, fontSize: 13, color: colors.primary, lineHeight: 20 },
     version: {
       textAlign: "center",
       fontSize: 12,
@@ -122,10 +149,7 @@ export default function SettingsScreen() {
         <Text style={s.rowLabel}>{label}</Text>
         {sub && <Text style={s.rowSub}>{sub}</Text>}
       </View>
-      {right ??
-        (onPress ? (
-          <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-        ) : null)}
+      {right ?? (onPress ? <Feather name="chevron-right" size={16} color={colors.mutedForeground} /> : null)}
     </Pressable>
   );
 
@@ -139,17 +163,47 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+
+        {/* PERMISSIONS SECTION */}
         <View style={s.section}>
-          <Text style={s.sectionLabel}>ACESSIBILIDADE</Text>
-          <View style={s.infoCard}>
-            <Feather name="info" size={18} color={colors.primary} />
-            <Text style={s.infoText}>
-              Para automacao completa no Android, ative o Servico de Acessibilidade em:
-              {"\n\n"}Configuracoes → Acessibilidade → AutoClickPro → Ativar
-            </Text>
-          </View>
+          <Text style={s.sectionLabel}>PERMISSOES DO SISTEMA</Text>
+          <Pressable
+            style={s.permCard}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push("/permissions");
+            }}
+          >
+            <View style={s.permRow}>
+              <View style={s.permIcons}>
+                {[
+                  { icon: "eye", color: "#00ff88" },
+                  { icon: "layers", color: "#00ccff" },
+                  { icon: "battery-charging", color: "#ffaa00" },
+                ].map((item, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      s.permIconCircle,
+                      { backgroundColor: item.color + "22", zIndex: 3 - i, marginLeft: i === 0 ? 0 : -10 },
+                    ]}
+                  >
+                    <Feather name={item.icon as any} size={13} color={item.color} />
+                  </View>
+                ))}
+              </View>
+              <View style={s.permContent}>
+                <Text style={s.permTitle}>Ativar 3 Permissoes</Text>
+                <Text style={s.permSub}>Acessibilidade · Sobreposicao · Bateria</Text>
+              </View>
+              <View style={s.permBtn}>
+                <Text style={s.permBtnText}>Configurar</Text>
+              </View>
+            </View>
+          </Pressable>
         </View>
 
+        {/* PREFERENCES */}
         <View style={s.section}>
           <Text style={s.sectionLabel}>PREFERENCIAS</Text>
           <View style={s.card}>
@@ -182,9 +236,25 @@ export default function SettingsScreen() {
                 />
               }
             />
+            <View style={s.rowSep} />
+            <Row
+              icon="refresh-cw"
+              iconColor={colors.success}
+              label="Loop infinito padrao"
+              sub="Repetir sequencia ate pausar"
+              right={
+                <Switch
+                  value={loopDefault}
+                  onValueChange={setLoopDefault}
+                  trackColor={{ false: colors.muted, true: colors.primary }}
+                  thumbColor="#fff"
+                />
+              }
+            />
           </View>
         </View>
 
+        {/* ABOUT */}
         <View style={s.section}>
           <Text style={s.sectionLabel}>SOBRE</Text>
           <View style={s.card}>
@@ -196,18 +266,10 @@ export default function SettingsScreen() {
             />
             <View style={s.rowSep} />
             <Row
-              icon="star"
-              iconColor={colors.warning}
-              label="Avaliar o App"
-              sub="Ajude-nos com uma avaliacao"
-              onPress={() => Linking.openURL("https://apps.apple.com")}
-            />
-            <View style={s.rowSep} />
-            <Row
               icon="code"
               iconColor={colors.accent}
               label="Versao"
-              sub="AutoClickPro v2.0"
+              sub="AutoClickPro v2.0 · Build GitHub Actions"
             />
           </View>
         </View>
