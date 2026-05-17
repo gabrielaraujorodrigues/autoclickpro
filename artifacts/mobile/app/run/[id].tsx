@@ -11,23 +11,19 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { FloatingBubble } from "@/components/FloatingBubble";
 import { PulseRing } from "@/components/PulseRing";
 import { useAutoClick, type Step } from "@/context/AutoClickContext";
 import { useColors } from "@/hooks/useColors";
 
 const STEP_META: Record<string, { icon: string; color: string; label: string; desc: string }> = {
-  tap_gift:   { icon: "gift",        color: "#00ff88", label: "Clicando no Presente",  desc: "Detectando e clicando no icone de presente..." },
-  watch_ad:   { icon: "play-circle", color: "#00ccff", label: "Assistindo Anuncio",    desc: "Aguardando o anuncio terminar..." },
-  skip_ad:    { icon: "skip-forward",color: "#ffaa00", label: "Pulando Anuncio",       desc: "Clicando no botao Pular Anuncio..." },
-  close_x:    { icon: "x-circle",    color: "#ff4444", label: "Fechando (X)",          desc: "Clicando no X para fechar o anuncio..." },
-  wait:       { icon: "clock",       color: "#888888", label: "Aguardando",            desc: "Pausando antes do proximo passo..." },
-  tap_custom: { icon: "crosshair",   color: "#cc88ff", label: "Toque Customizado",     desc: "Executando toque customizado..." },
+  tap_gift:   { icon: "gift",         color: "#00ff88", label: "Clicando no Presente",  desc: "Detectando e clicando no icone de presente..." },
+  watch_ad:   { icon: "play-circle",  color: "#00ccff", label: "Assistindo Anuncio",    desc: "Aguardando o anuncio terminar..." },
+  skip_ad:    { icon: "skip-forward", color: "#ffaa00", label: "Pulando Anuncio",       desc: "Clicando no botao Pular Anuncio..." },
+  close_x:    { icon: "x-circle",     color: "#ff4444", label: "Fechando (X)",          desc: "Clicando no X para fechar o anuncio..." },
+  wait:       { icon: "clock",        color: "#888888", label: "Aguardando",            desc: "Pausando antes do proximo passo..." },
+  tap_custom: { icon: "crosshair",    color: "#cc88ff", label: "Toque Customizado",     desc: "Executando toque customizado..." },
 };
-
-function formatMs(ms: number) {
-  if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${ms}ms`;
-}
 
 export default function RunScreen() {
   const colors = useColors();
@@ -42,6 +38,7 @@ export default function RunScreen() {
   const [countdown, setCountdown] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isDone, setIsDone] = useState(false);
+  const [showBubble, setShowBubble] = useState(false);
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseScale = useRef(new Animated.Value(1)).current;
@@ -62,7 +59,7 @@ export default function RunScreen() {
   useEffect(() => {
     onStepComplete((step: Step, idx: number) => {
       setActiveStepIdx(idx);
-      setCompletedSteps((prev) => [...prev, idx]);
+      setCompletedSteps((prev) => (prev.includes(idx) ? prev : [...prev, idx]));
       animatePulse();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -72,8 +69,7 @@ export default function RunScreen() {
       if (countdownRef.current) clearInterval(countdownRef.current);
       const start = Date.now();
       countdownRef.current = setInterval(() => {
-        const elapsed = Date.now() - start;
-        const remaining = Math.max(0, Math.round((totalMs - elapsed) / 1000));
+        const remaining = Math.max(0, Math.round((totalMs - (Date.now() - start)) / 1000));
         setCountdown(remaining);
         if (remaining === 0 && countdownRef.current) {
           clearInterval(countdownRef.current);
@@ -86,6 +82,7 @@ export default function RunScreen() {
   useEffect(() => {
     if (!runState && completedSteps.length > 0) {
       setIsDone(true);
+      setShowBubble(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Animated.spring(successAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 6 }).start();
       if (countdownRef.current) clearInterval(countdownRef.current);
@@ -95,25 +92,28 @@ export default function RunScreen() {
   useEffect(() => {
     if (seq && !runState && !isDone) {
       startRun(params.id);
+      setShowBubble(true);
     }
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
 
-  const handleStop = () => {
+  const handleStop = useCallback(() => {
     stopRun();
+    setShowBubble(false);
     if (countdownRef.current) clearInterval(countdownRef.current);
     router.back();
-  };
+  }, [stopRun, router]);
 
-  const handleRestart = () => {
+  const handleRestart = useCallback(() => {
     setActiveStepIdx(null);
     setCompletedSteps([]);
     setIsDone(false);
     successAnim.setValue(0);
+    setShowBubble(true);
     startRun(params.id);
-  };
+  }, [successAnim, startRun, params.id]);
 
   if (!seq) return null;
 
@@ -121,6 +121,7 @@ export default function RunScreen() {
   const progress = runState?.progress ?? (isDone ? 1 : 0);
   const currentStep = activeStepIdx !== null ? seq.steps[activeStepIdx] : null;
   const currentMeta = currentStep ? STEP_META[currentStep.type] : null;
+  const accentColor = currentMeta?.color ?? colors.primary;
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -141,6 +142,18 @@ export default function RunScreen() {
       alignItems: "center",
       justifyContent: "center",
     },
+    bubbleToggleBtn: {
+      height: 36,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    bubbleToggleText: { fontSize: 12, fontWeight: "600", color: colors.mutedForeground },
     body: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
     circle: {
       width: 160,
@@ -158,8 +171,7 @@ export default function RunScreen() {
       alignItems: "center",
       justifyContent: "center",
     },
-    countdown: { fontSize: 42, fontWeight: "800", color: colors.foreground, marginTop: 6 },
-    countdownLabel: { fontSize: 12, color: colors.mutedForeground, fontWeight: "600" },
+    countdown: { fontSize: 20, fontWeight: "800", color: colors.foreground, marginTop: 6 },
     stepLabel: { fontSize: 22, fontWeight: "800", color: colors.foreground, textAlign: "center", marginBottom: 8 },
     stepDesc: { fontSize: 14, color: colors.mutedForeground, textAlign: "center", lineHeight: 20 },
     progressBar: {
@@ -170,10 +182,7 @@ export default function RunScreen() {
       marginTop: 32,
       overflow: "hidden",
     },
-    progressFill: {
-      height: 4,
-      borderRadius: 2,
-    },
+    progressFill: { height: 4, borderRadius: 2 },
     progressLabel: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -215,6 +224,17 @@ export default function RunScreen() {
       gap: 8,
     },
     pauseBtnText: { fontSize: 16, fontWeight: "700", color: colors.foreground },
+    stopBtnBottom: {
+      height: 56,
+      width: 56,
+      borderRadius: 16,
+      backgroundColor: colors.destructive + "15",
+      borderColor: colors.destructive + "44",
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    // Success screen
     successOverlay: {
       flex: 1,
       alignItems: "center",
@@ -256,6 +276,21 @@ export default function RunScreen() {
       borderWidth: 1,
       borderColor: colors.border,
     },
+    // Hint bar
+    hintBar: {
+      marginHorizontal: 20,
+      marginBottom: 8,
+      backgroundColor: colors.card,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    hintText: { flex: 1, fontSize: 12, color: colors.mutedForeground },
   });
 
   if (isDone) {
@@ -288,8 +323,6 @@ export default function RunScreen() {
     );
   }
 
-  const accentColor = currentMeta?.color ?? colors.primary;
-
   return (
     <Animated.View style={[s.container, { opacity: fadeAnim }]}>
       <View style={s.header}>
@@ -297,24 +330,49 @@ export default function RunScreen() {
           <Feather name="square" size={16} color={colors.destructive} />
         </Pressable>
         <Text style={s.headerTitle}>{seq.name}</Text>
-        <View style={{ width: 40 }} />
+        {/* Toggle bubble visibility */}
+        <Pressable
+          style={s.bubbleToggleBtn}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowBubble((p) => !p);
+          }}
+        >
+          <Feather name="circle" size={10} color={showBubble ? accentColor : colors.mutedForeground} />
+          <Text style={[s.bubbleToggleText, showBubble && { color: accentColor }]}>
+            {showBubble ? "Bolha ON" : "Bolha OFF"}
+          </Text>
+        </Pressable>
       </View>
 
+      {/* Hint about minimizing */}
+      {showBubble && (
+        <View style={s.hintBar}>
+          <Feather name="info" size={13} color={colors.mutedForeground} />
+          <Text style={s.hintText}>
+            A bolha fica visivel mesmo ao minimizar o app. Arraste para mover, toque para expandir.
+          </Text>
+        </View>
+      )}
+
       <View style={s.body}>
+        {/* Main pulse circle */}
         <View style={{ position: "relative", width: 160, height: 160, alignItems: "center", justifyContent: "center", marginBottom: 32 }}>
           <PulseRing color={accentColor} size={160} active={!!runState && !isPaused} />
-          <Animated.View style={[
-            s.circle,
-            {
-              position: "absolute",
-              borderColor: accentColor + "55",
-              transform: [{ scale: pulseScale }],
-            },
-          ]}>
+          <Animated.View
+            style={[
+              s.circle,
+              {
+                position: "absolute",
+                borderColor: accentColor + "55",
+                transform: [{ scale: pulseScale }],
+              },
+            ]}
+          >
             <View style={[s.circleInner, { backgroundColor: accentColor + "15" }]}>
               <Feather name={(currentMeta?.icon ?? "loader") as any} size={40} color={accentColor} />
               {countdown > 0 && (
-                <Text style={[s.countdown, { color: accentColor, fontSize: 20, marginTop: 4 }]}>{countdown}s</Text>
+                <Text style={[s.countdown, { color: accentColor }]}>{countdown}s</Text>
               )}
             </View>
           </Animated.View>
@@ -324,12 +382,7 @@ export default function RunScreen() {
         <Text style={s.stepDesc}>{currentMeta?.desc ?? "Preparando automacao..."}</Text>
 
         <View style={s.progressBar}>
-          <Animated.View
-            style={[
-              s.progressFill,
-              { width: `${Math.round(progress * 100)}%`, backgroundColor: accentColor },
-            ]}
-          />
+          <View style={[s.progressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: accentColor }]} />
         </View>
         <View style={s.progressLabel}>
           <Text style={s.progressText}>
@@ -338,6 +391,7 @@ export default function RunScreen() {
           <Text style={s.progressText}>{Math.round(progress * 100)}%</Text>
         </View>
 
+        {/* Step pills */}
         <View style={s.stepsRow}>
           {seq.steps.map((step, i) => {
             const meta = STEP_META[step.type];
@@ -349,16 +403,8 @@ export default function RunScreen() {
                 style={[
                   s.stepPip,
                   {
-                    backgroundColor: isActive
-                      ? meta.color + "22"
-                      : isDoneStep
-                      ? meta.color + "11"
-                      : colors.muted,
-                    borderColor: isActive
-                      ? meta.color
-                      : isDoneStep
-                      ? meta.color + "55"
-                      : colors.border,
+                    backgroundColor: isActive ? meta.color + "22" : isDoneStep ? meta.color + "11" : colors.muted,
+                    borderColor: isActive ? meta.color : isDoneStep ? meta.color + "55" : colors.border,
                   },
                 ]}
               >
@@ -373,6 +419,7 @@ export default function RunScreen() {
         </View>
       </View>
 
+      {/* Bottom controls */}
       <View style={s.controls}>
         <Pressable
           style={s.pauseBtn}
@@ -389,10 +436,23 @@ export default function RunScreen() {
           <Feather name={isPaused ? "play" : "pause"} size={20} color={colors.foreground} />
           <Text style={s.pauseBtnText}>{isPaused ? "Continuar" : "Pausar"}</Text>
         </Pressable>
-        <Pressable style={[s.pauseBtn, { flex: 0, width: 56, backgroundColor: colors.destructive + "15", borderColor: colors.destructive + "44" }]} onPress={handleStop}>
+        <Pressable style={s.stopBtnBottom} onPress={handleStop}>
           <Feather name="square" size={20} color={colors.destructive} />
         </Pressable>
       </View>
+
+      {/* Floating bubble */}
+      <FloatingBubble
+        visible={showBubble && !isDone}
+        stepType={currentStep?.type ?? "wait"}
+        stepLabel={currentMeta?.label ?? "Iniciando..."}
+        countdown={countdown}
+        progress={progress}
+        isPaused={isPaused}
+        onPause={pauseRun}
+        onResume={resumeRun}
+        onStop={handleStop}
+      />
     </Animated.View>
   );
 }
