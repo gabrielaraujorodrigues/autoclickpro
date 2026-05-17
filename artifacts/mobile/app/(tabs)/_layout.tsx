@@ -1,5 +1,5 @@
-import { Redirect } from "expo-router";
+import { Slot } from "expo-router";
 
 export default function TabsLayout() {
-  return <Redirect href="/" />;
+  return <Slot />;
 }
