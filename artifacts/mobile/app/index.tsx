@@ -237,6 +237,19 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {!runState && (
+          <Pressable
+            style={[s.activeBanner, { backgroundColor: colors.warning + "15", borderColor: colors.warning + "44" }]}
+            onPress={() => router.push("/permissions")}
+          >
+            <Feather name="alert-triangle" size={14} color={colors.warning} />
+            <Text style={[s.activeBannerText, { color: colors.warning }]}>
+              Ative as 3 permissoes para automacao completa
+            </Text>
+            <Text style={[s.viewBtn, { color: colors.warning }]}>Ativar</Text>
+          </Pressable>
+        )}
+
         {runState && (
           <Pressable
             style={s.activeBanner}
