@@ -26,6 +26,7 @@ function RootLayoutNav() {
       <Stack.Screen name="builder" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen name="run/[id]" options={{ headerShown: false, presentation: "fullScreenModal" }} />
       <Stack.Screen name="settings" options={{ headerShown: false, presentation: "modal" }} />
+      <Stack.Screen name="permissions" options={{ headerShown: false, presentation: "modal" }} />
     </Stack>
   );
 }
