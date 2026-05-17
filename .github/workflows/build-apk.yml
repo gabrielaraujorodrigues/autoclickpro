@@ -8,6 +8,9 @@ on:
         required: false
         default: 'Build manual'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Compilar AutoClickPro APK
